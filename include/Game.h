@@ -1,5 +1,6 @@
 #pragma once
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 #include <vector>
 #include "Player.h"
 #include "Bullet.h"
@@ -19,6 +20,11 @@ private:
     std::vector<Enemy> enemies;
     std::vector<PowerUp> powerUps;
     std::vector<sf::RectangleShape> enemyBullets;
+
+    // Audio
+    sf::Music bgMusic;                    // nhạc nền (stream)
+    sf::SoundBuffer explosionBuffer;      // buffer cho âm thanh nổ
+    sf::Sound explosionSound;             // sound dùng để phát nổ
 
     sf::Clock shootTimer;
     sf::Clock enemySpawnTimer;
