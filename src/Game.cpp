@@ -121,9 +121,7 @@ void Game::update() {
                         bullets.emplace_back(playerCenter + sf::Vector2f(10,0), PowerType::DoubleShot);
                         break;
                     case PowerType::HomingShot:
-                        bullets.emplace_back(playerCenter + sf::Vector2f(-12,0), PowerType::HomingShot);
                         bullets.emplace_back(playerCenter, PowerType::HomingShot);
-                        bullets.emplace_back(playerCenter + sf::Vector2f(12,0), PowerType::HomingShot);
                         break;
                     case PowerType::LaserBeam:
                         bullets.emplace_back(playerCenter, PowerType::LaserBeam);
