@@ -9,6 +9,7 @@
 Game::Game()
     : window(sf::VideoMode(1280, 720), "Space Shooter - Boss & HighScore"),
       score(0), highScore(0), isGameOver(false), bossSpawned(false),
+      isPaused(false), // === PAUSE FEATURE ===
       difficultyLevel(1), enemySpawnInterval(1.0f), enemySpeedMultiplier(1.0f),
       screenShakeMagnitude(0.f), screenShakeDuration(0.f)
 {
@@ -32,6 +33,13 @@ Game::Game()
     gameOverText.setFont(font); gameOverText.setCharacterSize(36); gameOverText.setFillColor(sf::Color::Red);
     gameOverText.setString("GAME OVER - Press R to Restart"); gameOverText.setPosition(350,320);
 
+    // === PAUSE FEATURE ===
+    pauseText.setFont(font);
+    pauseText.setCharacterSize(40);
+    pauseText.setFillColor(sf::Color::Cyan);
+    pauseText.setString("PAUSED - Press SPACE to Resume");
+    pauseText.setPosition(340, 320);
+
     // Load background
     if (!backgroundTexture.loadFromFile("assets/Background.png"))
         std::cerr << "⚠️ Warning: Cannot load background image!\n";
@@ -42,18 +50,18 @@ Game::Game()
     );
 
     // ===== AUDIO SETUP =====
-    // Background music (streamed) - loop forever
+    // Background music (streamed)
     if (!bgMusic.openFromFile("assets/musicbg.ogg")) {
-        std::cerr << "⚠️ Warning: Cannot load background music (assets/musicbg.ogg)!\n";
+        std::cerr << "⚠️ Warning: Cannot load background music!\n";
     } else {
         bgMusic.setLoop(true);
-        bgMusic.setVolume(50.f); // default volume
+        bgMusic.setVolume(50.f);
         bgMusic.play();
     }
 
     // Explosion sound (short SFX)
     if (!explosionBuffer.loadFromFile("assets/explosion.wav")) {
-        std::cerr << "⚠️ Warning: Cannot load explosion sound (assets/explosion.wav)!\n";
+        std::cerr << "⚠️ Warning: Cannot load explosion sound!\n";
     } else {
         explosionSound.setBuffer(explosionBuffer);
         explosionSound.setVolume(80.f);
@@ -80,10 +88,21 @@ void Game::processEvents() {
         if (event.type == sf::Event::Closed)
             window.close();
     }
+
     if (isGameOver && sf::Keyboard::isKeyPressed(sf::Keyboard::R))
         resetGame();
 
-    // Toggle music on/off with M (optional convenience)
+    // === PAUSE FEATURE ===
+    static bool spacePressedLast = false;
+    bool spacePressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
+    if (spacePressed && !spacePressedLast) {
+        isPaused = !isPaused;
+        if (isPaused) bgMusic.pause();
+        else bgMusic.play();
+    }
+    spacePressedLast = spacePressed;
+
+    // Toggle music manually (M)
     static bool mPressedLast = false;
     bool mPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::M);
     if (mPressed && !mPressedLast) {
@@ -96,6 +115,9 @@ void Game::processEvents() {
 // ===================== UPDATE =====================
 void Game::update() {
     if (isGameOver) return;
+
+    // === PAUSE FEATURE ===
+    if (isPaused) return;
 
     // ===================== INCREASE DIFFICULTY =====================
     if (difficultyClock.getElapsedTime().asSeconds() > 10.f) {
@@ -154,7 +176,7 @@ void Game::update() {
         }
     }
 
-    // ===================== SPAWN NORMAL / SPECIAL ENEMY =====================
+    // ===================== SPAWN NORMAL ENEMY =====================
     if (enemySpawnTimer.getElapsedTime().asSeconds() > enemySpawnInterval) {
         spawnEnemy();
         enemySpawnTimer.restart();
@@ -164,12 +186,10 @@ void Game::update() {
     for (auto& e : enemies)
         e.update(playerCenter, enemyBullets, enemySpeedMultiplier);
 
-    // Move enemy bullets
     for (auto& eb : enemyBullets)
         eb.move(0.f, 0.3f * enemySpeedMultiplier);
 
     // ===================== ENEMY BULLETS VS PLAYER =====================
-    // Duyệt ngược để xóa an toàn khi trúng
     for (int i = int(enemyBullets.size()) - 1; i >= 0; --i) {
         if (enemyBullets[i].getGlobalBounds().intersects(player.getBounds())) {
             if (!player.isInvincible()) {
@@ -177,20 +197,16 @@ void Game::update() {
                 createExplosion(playerCenter, sf::Color::Red, 15.f);
                 startScreenShake(0.3f, 8.f);
             }
-
-            // Xóa viên đạn vừa chạm
             enemyBullets.erase(enemyBullets.begin() + i);
-
-            // Nếu máu <= 0 => game over
             if (player.getHP() <= 0) {
                 isGameOver = true;
                 saveHighScore();
-                return; // thoát update() để tránh xử lý tiếp
+                return;
             }
         }
     }
 
-    // ===================== COLLISION BULLET/ENEMY =====================
+    // ===================== BULLET / ENEMY COLLISION =====================
     std::vector<int> bulletsToRemove;
     for (int ei = int(enemies.size()) - 1; ei >= 0; --ei) {
         for (int bi = int(bullets.size()) - 1; bi >= 0; --bi) {
@@ -218,10 +234,8 @@ void Game::update() {
                         bossSpawned = false;
                         bossSpawnClock.restart();
                         startScreenShake(0.8f, 12.f);
-                        // --- Play explosion SFX only when boss dies ---
-                        if (explosionBuffer.getSampleCount() > 0) {
+                        if (explosionBuffer.getSampleCount() > 0)
                             explosionSound.play();
-                        }
                     }
 
                     if (std::rand() % 5 == 0) {
@@ -253,7 +267,7 @@ void Game::update() {
     enemyBullets.erase(std::remove_if(enemyBullets.begin(), enemyBullets.end(),
         [&](sf::RectangleShape& eb) { return eb.getPosition().y > window.getSize().y; }), enemyBullets.end());
 
-    // ===================== POWER-UPS =====================
+    // ===================== POWERUPS =====================
     for (int i = int(powerUps.size()) - 1; i >= 0; --i) {
         if (powerUps[i].getBounds().intersects(player.getBounds())) {
             player.applyPowerUp(powerUps[i].getType(),5.f);
@@ -285,7 +299,6 @@ void Game::update() {
 
     updateScreenShake();
     updateExplosions();
-
     scoreText.setString("Score: " + std::to_string(score));
     highScoreText.setString("High Score: " + std::to_string(highScore));
     hpText.setString("HP: " + std::to_string(player.getHP()));
@@ -309,7 +322,11 @@ void Game::render() {
     window.draw(scoreText);
     window.draw(highScoreText);
     window.draw(hpText);
-    if (isGameOver) window.draw(gameOverText);
+
+    if (isGameOver)
+        window.draw(gameOverText);
+    else if (isPaused) // === PAUSE FEATURE ===
+        window.draw(pauseText);
 
     window.display();
 }
@@ -317,14 +334,8 @@ void Game::render() {
 // ===================== SPAWN ENEMY =====================
 void Game::spawnEnemy() {
     float x = float(std::rand() % (window.getSize().x - 60));
-
     int r = std::rand() % 100;
-    EnemyType type = EnemyType::Normal;
-
-    if (r < 70) type = EnemyType::Normal;      // 70% thường
-    else if (r < 90) type = EnemyType::Speed;  // 20% nhanh
-    else type = EnemyType::Tank;               // 10% trâu
-
+    EnemyType type = (r < 70) ? EnemyType::Normal : (r < 90 ? EnemyType::Speed : EnemyType::Tank);
     sf::Vector2f size;
     switch (type) {
         case EnemyType::Normal:
@@ -341,18 +352,16 @@ void Game::spawnEnemy() {
             break;
         default: break;
     }
-
     enemies.emplace_back(sf::Vector2f(x, -60.f), type, size);
 }
 
 // ===================== RESET GAME =====================
 void Game::resetGame() {
     enemies.clear(); bullets.clear(); enemyBullets.clear(); powerUps.clear(); explosions.clear();
-    score = 0; isGameOver = false; bossSpawned = false;
+    score = 0; isGameOver = false; bossSpawned = false; isPaused = false;
     difficultyLevel = 1; enemySpawnInterval = 1.0f; enemySpeedMultiplier = 1.0f;
     enemySpawnTimer.restart(); shootTimer.restart(); difficultyClock.restart();
     player.resetHP();
-    // keep bgMusic playing (or paused) as-is
 }
 
 // ===================== HIGH SCORE =====================
