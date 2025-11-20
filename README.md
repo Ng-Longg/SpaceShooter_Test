@@ -21,6 +21,7 @@ Một game bắn phi thuyền 2D viết bằng **C++ & SFML**, có hệ thống 
 - IDE khuyến nghị: **Visual Studio Code** hoặc **Visual Studio 2022**
 
 ---
+Link video demo: https://youtu.be/Z_UcyJ2QLKI
 
 ## ⚙️ Cách build & chạy
 
